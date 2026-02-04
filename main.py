@@ -1869,7 +1869,7 @@ async def ocr_extract(request: OcrRequest):
 
     try:
         model, tokenizer = _load_ocr_model()
-        prompt = request.prompt or os.getenv('OCR_PROMPT', 'Convert to markdown.')
+        prompt = request.prompt or os.getenv('OCR_PROMPT', '<image>\n<|grounding|>Convert the document to markdown.')
         base_size = int(os.getenv('OCR_BASE_SIZE', '1024'))
         image_size = int(os.getenv('OCR_IMAGE_SIZE', '640'))
         crop_mode = os.getenv('OCR_CROP_MODE', 'true').lower() in ['true', '1', 'yes']
@@ -1881,10 +1881,9 @@ async def ocr_extract(request: OcrRequest):
             with tempfile.TemporaryDirectory() as temp_dir:
                 image_path = os.path.join(temp_dir, f"page_{idx}.png")
                 image.save(image_path)
-                infer_prompt = f"<image>\\n{prompt}"
                 result = model.infer(
                     tokenizer,
-                    prompt=infer_prompt,
+                    prompt=prompt,
                     image_file=image_path,
                     output_path=temp_dir,
                     base_size=base_size,
