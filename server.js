@@ -6,6 +6,7 @@ const config = require('./config/config');
 const paperlessService = require('./services/paperlessService');
 const AIServiceFactory = require('./services/aiServiceFactory');
 const visionService = require('./services/visionService');
+const ocrService = require('./services/ocrService');
 const documentModel = require('./models/document');
 const setupService = require('./services/setupService');
 const setupRoutes = require('./routes/setup');
@@ -199,9 +200,25 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
 
   const aiService = AIServiceFactory.getService();
   const useVision = config.vision?.enabled === 'yes';
+  const useOcr = config.ocr?.enabled === 'yes';
   let originalData = await paperlessService.getDocument(doc.id);
   let content = '';
   let visionImages = [];
+  let ocrText = '';
+
+  if (useOcr) {
+    const mimeType = originalData?.mime_type || '';
+    const isSupported = mimeType === 'application/pdf' || mimeType.startsWith('image/');
+    if (isSupported) {
+      const ocrResult = await ocrService.extractDocumentText(doc.id);
+      if (ocrResult?.text) {
+        ocrText = ocrResult.text;
+        if (config.ocr.overwriteContent === 'yes') {
+          await paperlessService.updateDocumentContent(doc.id, ocrText);
+        }
+      }
+    }
+  }
 
   if (useVision) {
     if (config.aiProvider !== 'custom') {
@@ -209,23 +226,33 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
     }
     visionImages = await visionService.getDocumentImages(doc.id);
     if (!visionImages || visionImages.length === 0) {
-      console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
-      return null;
+      if (config.vision.includeText !== 'yes' || !ocrText) {
+        console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
+        return null;
+      }
     }
     if (config.vision.includeText === 'yes') {
-      content = await paperlessService.getDocumentContent(doc.id);
-      if (content.length > 50000) {
-        content = content.substring(0, 50000);
+      if (ocrText) {
+        content = ocrText;
+      } else {
+        content = await paperlessService.getDocumentContent(doc.id);
+        if (content.length > 50000) {
+          content = content.substring(0, 50000);
+        }
       }
     }
   } else {
-    content = await paperlessService.getDocumentContent(doc.id);
-    if (!content || !content.length >= 10) {
-      console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
-      return null;
-    }
-    if (content.length > 50000) {
-      content = content.substring(0, 50000);
+    if (ocrText) {
+      content = ocrText;
+    } else {
+      content = await paperlessService.getDocumentContent(doc.id);
+      if (!content || !content.length >= 10) {
+        console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
+        return null;
+      }
+      if (content.length > 50000) {
+        content = content.substring(0, 50000);
+      }
     }
   }
 

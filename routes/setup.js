@@ -3,6 +3,7 @@ const router = express.Router();
 const setupService = require('../services/setupService.js');
 const paperlessService = require('../services/paperlessService.js');
 const visionService = require('../services/visionService');
+const ocrService = require('../services/ocrService');
 const openaiService = require('../services/openaiService.js');
 const ollamaService = require('../services/ollamaService.js');
 const azureService = require('../services/azureService.js');
@@ -1563,9 +1564,25 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
 
   const aiService = AIServiceFactory.getService();
   const useVision = config.vision?.enabled === 'yes';
+  const useOcr = config.ocr?.enabled === 'yes';
   let originalData = await paperlessService.getDocument(doc.id);
   let content = '';
   let visionImages = [];
+  let ocrText = '';
+
+  if (useOcr) {
+    const mimeType = originalData?.mime_type || '';
+    const isSupported = mimeType === 'application/pdf' || mimeType.startsWith('image/');
+    if (isSupported) {
+      const ocrResult = await ocrService.extractDocumentText(doc.id);
+      if (ocrResult?.text) {
+        ocrText = ocrResult.text;
+        if (config.ocr.overwriteContent === 'yes') {
+          await paperlessService.updateDocumentContent(doc.id, ocrText);
+        }
+      }
+    }
+  }
 
   if (useVision) {
     if (config.aiProvider !== 'custom') {
@@ -1573,23 +1590,33 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
     }
     visionImages = await visionService.getDocumentImages(doc.id);
     if (!visionImages || visionImages.length === 0) {
-      console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
-      return null;
+      if (config.vision.includeText !== 'yes' || !ocrText) {
+        console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
+        return null;
+      }
     }
     if (config.vision.includeText === 'yes') {
-      content = await paperlessService.getDocumentContent(doc.id);
-      if (content.length > 50000) {
-        content = content.substring(0, 50000);
+      if (ocrText) {
+        content = ocrText;
+      } else {
+        content = await paperlessService.getDocumentContent(doc.id);
+        if (content.length > 50000) {
+          content = content.substring(0, 50000);
+        }
       }
     }
   } else {
-    content = await paperlessService.getDocumentContent(doc.id);
-    if (!content || !content.length >= 10) {
-      console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
-      return null;
-    }
-    if (content.length > 50000) {
-      content = content.substring(0, 50000);
+    if (ocrText) {
+      content = ocrText;
+    } else {
+      content = await paperlessService.getDocumentContent(doc.id);
+      if (!content || !content.length >= 10) {
+        console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
+        return null;
+      }
+      if (content.length > 50000) {
+        content = content.substring(0, 50000);
+      }
     }
   }
 
@@ -1921,6 +1948,17 @@ router.get('/setup', async (req, res) => {
       VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
       VISION_DPI: process.env.VISION_DPI || '150',
       VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes',
+      OCR_ENABLED: process.env.OCR_ENABLED || 'no',
+      OCR_OVERWRITE_CONTENT: process.env.OCR_OVERWRITE_CONTENT || 'no',
+      OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+      OCR_PROMPT: process.env.OCR_PROMPT || 'Convert to markdown.',
+      OCR_MAX_PAGES: process.env.OCR_MAX_PAGES || '50',
+      OCR_IMAGE_FORMAT: process.env.OCR_IMAGE_FORMAT || 'png',
+      OCR_DPI: process.env.OCR_DPI || '150',
+      OCR_MAX_NEW_TOKENS: process.env.OCR_MAX_NEW_TOKENS || '4096',
+      OCR_MAX_CHARS: process.env.OCR_MAX_CHARS || '50000',
+      OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000',
       PAPERLESS_AI_VERSION: configFile.PAPERLESS_AI_VERSION || ' ',
       PROCESS_ONLY_NEW_DOCUMENTS: process.env.PROCESS_ONLY_NEW_DOCUMENTS || 'yes',
       USE_EXISTING_DATA: process.env.USE_EXISTING_DATA || 'no',
@@ -2724,6 +2762,17 @@ router.get('/settings', async (req, res) => {
     VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
     VISION_DPI: process.env.VISION_DPI || '150',
     VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes',
+    OCR_ENABLED: process.env.OCR_ENABLED || 'no',
+    OCR_OVERWRITE_CONTENT: process.env.OCR_OVERWRITE_CONTENT || 'no',
+    OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+    OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+    OCR_PROMPT: process.env.OCR_PROMPT || 'Convert to markdown.',
+    OCR_MAX_PAGES: process.env.OCR_MAX_PAGES || '50',
+    OCR_IMAGE_FORMAT: process.env.OCR_IMAGE_FORMAT || 'png',
+    OCR_DPI: process.env.OCR_DPI || '150',
+    OCR_MAX_NEW_TOKENS: process.env.OCR_MAX_NEW_TOKENS || '4096',
+    OCR_MAX_CHARS: process.env.OCR_MAX_CHARS || '50000',
+    OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000',
     PAPERLESS_AI_VERSION: configFile.PAPERLESS_AI_VERSION || ' ',
     PROCESS_ONLY_NEW_DOCUMENTS: process.env.PROCESS_ONLY_NEW_DOCUMENTS || ' ',
     USE_EXISTING_DATA: process.env.USE_EXISTING_DATA || 'no',
@@ -3653,7 +3702,16 @@ router.post('/setup', express.json(), async (req, res) => {
       visionMaxPages,
       visionImageFormat,
       visionDpi,
-      visionIncludeText
+      visionIncludeText,
+      ocrEnabled,
+      ocrOverwriteContent,
+      ocrMaxPages,
+      ocrImageFormat,
+      ocrDpi,
+      ocrPrompt,
+      ocrMaxNewTokens,
+      ocrMaxChars,
+      ocrTimeoutMs
     } = req.body;
 
     // Log setup request with sensitive data redacted
@@ -3761,6 +3819,17 @@ router.post('/setup', express.json(), async (req, res) => {
       VISION_IMAGE_FORMAT: visionImageFormat || 'png',
       VISION_DPI: visionDpi || '150',
       VISION_INCLUDE_TEXT: visionIncludeText || 'yes',
+      OCR_ENABLED: ocrEnabled || 'no',
+      OCR_OVERWRITE_CONTENT: ocrOverwriteContent || 'no',
+      OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+      OCR_PROMPT: ocrPrompt || 'Convert to markdown.',
+      OCR_MAX_PAGES: ocrMaxPages || '50',
+      OCR_IMAGE_FORMAT: ocrImageFormat || 'png',
+      OCR_DPI: ocrDpi || '150',
+      OCR_MAX_NEW_TOKENS: ocrMaxNewTokens || '4096',
+      OCR_MAX_CHARS: ocrMaxChars || '50000',
+      OCR_TIMEOUT_MS: ocrTimeoutMs || '120000',
       USE_EXISTING_DATA: useExistingData || 'no',
       API_KEY: apiToken,
       JWT_SECRET: jwtToken,
@@ -4070,7 +4139,16 @@ router.post('/settings', express.json(), async (req, res) => {
       visionMaxPages,
       visionImageFormat,
       visionDpi,
-      visionIncludeText
+      visionIncludeText,
+      ocrEnabled,
+      ocrOverwriteContent,
+      ocrMaxPages,
+      ocrImageFormat,
+      ocrDpi,
+      ocrPrompt,
+      ocrMaxNewTokens,
+      ocrMaxChars,
+      ocrTimeoutMs
     } = req.body;
 
     //replace equal char in system prompt
@@ -4128,7 +4206,18 @@ router.post('/settings', express.json(), async (req, res) => {
       VISION_MAX_PAGES: process.env.VISION_MAX_PAGES || '1',
       VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
       VISION_DPI: process.env.VISION_DPI || '150',
-      VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes'
+      VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes',
+      OCR_ENABLED: process.env.OCR_ENABLED || 'no',
+      OCR_OVERWRITE_CONTENT: process.env.OCR_OVERWRITE_CONTENT || 'no',
+      OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+      OCR_PROMPT: process.env.OCR_PROMPT || 'Convert to markdown.',
+      OCR_MAX_PAGES: process.env.OCR_MAX_PAGES || '50',
+      OCR_IMAGE_FORMAT: process.env.OCR_IMAGE_FORMAT || 'png',
+      OCR_DPI: process.env.OCR_DPI || '150',
+      OCR_MAX_NEW_TOKENS: process.env.OCR_MAX_NEW_TOKENS || '4096',
+      OCR_MAX_CHARS: process.env.OCR_MAX_CHARS || '50000',
+      OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000'
     };
 
     // Process custom fields
@@ -4256,6 +4345,15 @@ router.post('/settings', express.json(), async (req, res) => {
     if (visionImageFormat) updatedConfig.VISION_IMAGE_FORMAT = visionImageFormat;
     if (visionDpi) updatedConfig.VISION_DPI = visionDpi;
     if (visionIncludeText) updatedConfig.VISION_INCLUDE_TEXT = visionIncludeText;
+    if (ocrEnabled) updatedConfig.OCR_ENABLED = ocrEnabled;
+    if (ocrOverwriteContent) updatedConfig.OCR_OVERWRITE_CONTENT = ocrOverwriteContent;
+    if (ocrPrompt) updatedConfig.OCR_PROMPT = ocrPrompt;
+    if (ocrMaxPages) updatedConfig.OCR_MAX_PAGES = ocrMaxPages;
+    if (ocrImageFormat) updatedConfig.OCR_IMAGE_FORMAT = ocrImageFormat;
+    if (ocrDpi) updatedConfig.OCR_DPI = ocrDpi;
+    if (ocrMaxNewTokens) updatedConfig.OCR_MAX_NEW_TOKENS = ocrMaxNewTokens;
+    if (ocrMaxChars) updatedConfig.OCR_MAX_CHARS = ocrMaxChars;
+    if (ocrTimeoutMs) updatedConfig.OCR_TIMEOUT_MS = ocrTimeoutMs;
 
     // Update custom fields
     if (processedCustomFields.length > 0 || customFields) {

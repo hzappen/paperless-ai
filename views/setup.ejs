@@ -398,6 +398,67 @@
                                                min="72">
                                     </div>
 
+                                    <!-- OCR Settings -->
+                                    <div class="form-group">
+                                        <label for="ocrEnabled">Enable OCR</label>
+                                        <select id="ocrEnabled" 
+                                                name="ocrEnabled"
+                                                class="modern-input">
+                                            <option value="no" <%= config.OCR_ENABLED === 'no' ? 'selected' : '' %>>No</option>
+                                            <option value="yes" <%= config.OCR_ENABLED === 'yes' ? 'selected' : '' %>>Yes</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrOverwriteContent">Overwrite Paperless Content</label>
+                                        <select id="ocrOverwriteContent" 
+                                                name="ocrOverwriteContent"
+                                                class="modern-input">
+                                            <option value="no" <%= config.OCR_OVERWRITE_CONTENT === 'no' ? 'selected' : '' %>>No</option>
+                                            <option value="yes" <%= config.OCR_OVERWRITE_CONTENT === 'yes' ? 'selected' : '' %>>Yes</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrMaxPages">OCR Max Pages</label>
+                                        <input type="number" 
+                                               id="ocrMaxPages" 
+                                               name="ocrMaxPages"
+                                               value="<%= config.OCR_MAX_PAGES %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrImageFormat">OCR Image Format</label>
+                                        <select id="ocrImageFormat" 
+                                                name="ocrImageFormat"
+                                                class="modern-input">
+                                            <option value="png" <%= config.OCR_IMAGE_FORMAT === 'png' ? 'selected' : '' %>>PNG</option>
+                                            <option value="jpg" <%= config.OCR_IMAGE_FORMAT === 'jpg' ? 'selected' : '' %>>JPG</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrDpi">OCR DPI</label>
+                                        <input type="number" 
+                                               id="ocrDpi" 
+                                               name="ocrDpi"
+                                               value="<%= config.OCR_DPI %>"
+                                               class="modern-input"
+                                               min="72">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrPrompt">OCR Prompt</label>
+                                        <input type="text" 
+                                               id="ocrPrompt" 
+                                               name="ocrPrompt"
+                                               value="<%= config.OCR_PROMPT %>"
+                                               class="modern-input"
+                                               placeholder="Convert to markdown.">
+                                    </div>
+
                                     <div class="form-group">
                                         <label for="tokenLimit">Token Limit</label>
                                         <input type="number" 

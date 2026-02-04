@@ -462,6 +462,67 @@
                                         min="72">
                                 </div>
 
+                                <!-- OCR Settings -->
+                                <div class="space-y-2">
+                                    <label for="ocrEnabled" class="text-sm font-medium">Enable OCR</label>
+                                    <select id="ocrEnabled" 
+                                            name="ocrEnabled"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="no" <%= config.OCR_ENABLED === 'no' ? 'selected' : '' %>>No</option>
+                                        <option value="yes" <%= config.OCR_ENABLED === 'yes' ? 'selected' : '' %>>Yes</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrOverwriteContent" class="text-sm font-medium">Overwrite Paperless Content</label>
+                                    <select id="ocrOverwriteContent" 
+                                            name="ocrOverwriteContent"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="no" <%= config.OCR_OVERWRITE_CONTENT === 'no' ? 'selected' : '' %>>No</option>
+                                        <option value="yes" <%= config.OCR_OVERWRITE_CONTENT === 'yes' ? 'selected' : '' %>>Yes</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrMaxPages" class="text-sm font-medium">OCR Max Pages</label>
+                                    <input type="number" 
+                                        id="ocrMaxPages" 
+                                        name="ocrMaxPages"
+                                        value="<%= config.OCR_MAX_PAGES %>"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrImageFormat" class="text-sm font-medium">OCR Image Format</label>
+                                    <select id="ocrImageFormat" 
+                                            name="ocrImageFormat"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="png" <%= config.OCR_IMAGE_FORMAT === 'png' ? 'selected' : '' %>>PNG</option>
+                                        <option value="jpg" <%= config.OCR_IMAGE_FORMAT === 'jpg' ? 'selected' : '' %>>JPG</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrDpi" class="text-sm font-medium">OCR DPI</label>
+                                    <input type="number" 
+                                        id="ocrDpi" 
+                                        name="ocrDpi"
+                                        value="<%= config.OCR_DPI %>"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        min="72">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrPrompt" class="text-sm font-medium">OCR Prompt</label>
+                                    <input type="text" 
+                                           id="ocrPrompt" 
+                                           name="ocrPrompt"
+                                           value="<%= config.OCR_PROMPT %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="Convert to markdown.">
+                                </div>
+
                                 <!-- Token Limit Field -->
                                 <div class="space-y-2">
                                     <label for="tokenLimit">Token Limit</label>

@@ -1384,6 +1384,19 @@ async getOrCreateDocumentType(name) {
       return null;
     }
   }
+
+  async updateDocumentContent(documentId, content) {
+    this.initialize();
+    if (!this.client) return null;
+    try {
+      await this.client.patch(`/documents/${documentId}/`, { content });
+      console.log(`[DEBUG] Updated content for document ${documentId}`);
+      return true;
+    } catch (error) {
+      console.error(`[ERROR] updating content for document ${documentId}:`, error.message);
+      return null;
+    }
+  }
 }
 
 

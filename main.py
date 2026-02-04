@@ -1,4 +1,6 @@
 import os
+import base64
+from io import BytesIO
 import json
 import logging
 import hashlib
@@ -24,6 +26,8 @@ from rank_bm25 import BM25Okapi
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
+from PIL import Image
+from unsloth import FastVisionModel
 
 # Configure logging
 logging.basicConfig(
@@ -101,6 +105,11 @@ class AskQuestionRequest(BaseModel):
     question: str
     max_sources: int = 5
 
+class OcrRequest(BaseModel):
+    images: List[str]
+    prompt: Optional[str] = None
+    max_new_tokens: Optional[int] = None
+
 # Response models
 class SearchResult(BaseModel):
     title: str
@@ -120,13 +129,13 @@ class GlobalState:
         self.indexing_status = IndexingStatus()
         self.state_schema_version = 1  # Track schema version for future upgrades
         self._indexed_document_ids = set()  # Store temporarily until data_manager is initialized
-    
+
     def save_state(self):
         """Save global state to disk with schema version"""
         try:
             # Ensure data directory exists
             os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
-            
+
             # Create a serializable state object
             state_dict = {
                 "schema_version": self.state_schema_version,
@@ -145,29 +154,29 @@ class GlobalState:
                 },
                 "indexed_document_ids": list(self.data_manager.indexed_document_ids) if self.data_manager else list(self._indexed_document_ids)
             }
-            
+
             with open(STATE_FILE, 'w', encoding='utf-8') as f:
                 json.dump(state_dict, f, ensure_ascii=False, indent=2)
-                
+
             logger.info(f"System state saved to {STATE_FILE}")
             return True
         except Exception as e:
             logger.error(f"Error saving system state: {str(e)}")
             return False
-    
+
     def load_state(self):
         """Load global state from disk with schema version check"""
         try:
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state_dict = json.load(f)
-                
+
                 # Check schema version for compatibility
                 schema_version = state_dict.get("schema_version", 0)
                 if schema_version != self.state_schema_version:
                     logger.warning(f"State file schema version mismatch: {schema_version} vs {self.state_schema_version}")
                     # Still try to load what we can
-                
+
                 # Update indexing status - ENSURE ALL FIELDS ARE PROPERLY UPDATED
                 if "indexing_status" in state_dict:
                     idx_status = state_dict["indexing_status"]
@@ -177,9 +186,9 @@ class GlobalState:
                     self.indexing_status.message = idx_status.get("message", "")
                     # Always set running to False on startup
                     self.indexing_status.running = False
-                    
+
                     logger.info(f"Loaded indexing status: {self.indexing_status.documents_count} documents, last indexed: {self.indexing_status.last_indexed}")
-                
+
                 # Update system status
                 if "system_status" in state_dict:
                     sys_status = state_dict["system_status"]
@@ -187,10 +196,10 @@ class GlobalState:
                     self.system_status.index_ready = sys_status.get("index_ready", False)
                     self.system_status.chroma_ready = sys_status.get("chroma_ready", False)
                     self.system_status.bm25_ready = sys_status.get("bm25_ready", False)
-                
+
                 # Store indexed_document_ids for later use when data_manager is initialized
                 self._indexed_document_ids = set(state_dict.get("indexed_document_ids", []))
-                
+
                 logger.info(f"System state loaded from {STATE_FILE} with {len(self._indexed_document_ids)} indexed document IDs")
                 return True
             else:
@@ -199,6 +208,32 @@ class GlobalState:
         except Exception as e:
             logger.error(f"Error loading system state: {str(e)}")
             return False
+
+# OCR model cache
+_ocr_model = None
+_ocr_tokenizer = None
+
+def _load_ocr_model():
+    global _ocr_model, _ocr_tokenizer
+    if _ocr_model is not None and _ocr_tokenizer is not None:
+        return _ocr_model, _ocr_tokenizer
+
+    model_id = os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2')
+    _ocr_model, _ocr_tokenizer = FastVisionModel.from_pretrained(
+        model_id,
+        max_seq_length=4096,
+        load_in_4bit=True
+    )
+    FastVisionModel.for_inference(_ocr_model)
+    return _ocr_model, _ocr_tokenizer
+
+def _decode_image_from_base64(data_url: str) -> Image.Image:
+    if data_url.startswith('data:'):
+        _, b64data = data_url.split(',', 1)
+    else:
+        b64data = data_url
+    image_bytes = base64.b64decode(b64data)
+    return Image.open(BytesIO(image_bytes)).convert('RGB')
 
 global_state = GlobalState()
 
@@ -1801,6 +1836,56 @@ async def get_status():
     status_dict["ai_model"] = "llama3.2:latest"
     
     return status_dict
+
+@app.post("/ocr")
+async def ocr_extract(request: OcrRequest):
+    if not request.images:
+        raise HTTPException(status_code=400, detail="No images provided")
+
+    try:
+        model, tokenizer = _load_ocr_model()
+        prompt = request.prompt or os.getenv('OCR_PROMPT', 'Convert to markdown.')
+        max_new_tokens = request.max_new_tokens or int(os.getenv('OCR_MAX_NEW_TOKENS', '4096'))
+        pages = []
+
+        for idx, image_data in enumerate(request.images, start=1):
+            image = _decode_image_from_base64(image_data)
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image", "image": image}
+                ]
+            }]
+
+            input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
+            inputs = tokenizer(
+                image,
+                input_text,
+                add_special_tokens=False,
+                return_tensors="pt"
+            ).to(model.device)
+
+            output = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                temperature=0.0,
+                do_sample=False
+            )
+
+            input_length = inputs["input_ids"].shape[1]
+            decoded = tokenizer.decode(output[0][input_length:], skip_special_tokens=True)
+            pages.append({"page": idx, "text": decoded.strip()})
+
+        combined = "\n\n".join(
+            [f"--- Page {page['page']} ---\n{page['text']}" for page in pages if page.get("text")]
+        )
+
+        return {"pages": pages, "text": combined}
+    except Exception as e:
+        logger.error(f"OCR error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/indexing/status", response_model=IndexingStatus)
 async def get_indexing_status():

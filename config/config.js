@@ -97,6 +97,19 @@ module.exports = {
     dpi: parseInt(process.env.VISION_DPI || '150', 10),
     includeText: parseEnvBoolean(process.env.VISION_INCLUDE_TEXT, 'yes')
   },
+  ocr: {
+    enabled: parseEnvBoolean(process.env.OCR_ENABLED, 'no'),
+    overwriteContent: parseEnvBoolean(process.env.OCR_OVERWRITE_CONTENT, 'no'),
+    serviceUrl: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+    modelId: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+    prompt: process.env.OCR_PROMPT || 'Convert to markdown.',
+    maxPages: parseInt(process.env.OCR_MAX_PAGES || '50', 10),
+    imageFormat: process.env.OCR_IMAGE_FORMAT || 'png',
+    dpi: parseInt(process.env.OCR_DPI || '150', 10),
+    maxNewTokens: parseInt(process.env.OCR_MAX_NEW_TOKENS || '4096', 10),
+    maxChars: parseInt(process.env.OCR_MAX_CHARS || '50000', 10),
+    timeoutMs: parseInt(process.env.OCR_TIMEOUT_MS || '120000', 10)
+  },
   scanInterval: process.env.SCAN_INTERVAL || '*/30 * * * *',
   useExistingData: process.env.USE_EXISTING_DATA || 'no',
   // Add limit functions to config
