@@ -411,6 +411,57 @@
                                     </div>
                                 </div>
 
+                                <!-- Vision Settings -->
+                                <div class="space-y-2">
+                                    <label for="visionEnabled" class="text-sm font-medium">Enable Vision Analysis</label>
+                                    <select id="visionEnabled" 
+                                            name="visionEnabled"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="no" <%= config.VISION_ENABLED === 'no' ? 'selected' : '' %>>No</option>
+                                        <option value="yes" <%= config.VISION_ENABLED === 'yes' ? 'selected' : '' %>>Yes</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="visionIncludeText" class="text-sm font-medium">Include Text Content</label>
+                                    <select id="visionIncludeText" 
+                                            name="visionIncludeText"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="yes" <%= config.VISION_INCLUDE_TEXT === 'yes' ? 'selected' : '' %>>Yes</option>
+                                        <option value="no" <%= config.VISION_INCLUDE_TEXT === 'no' ? 'selected' : '' %>>No</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="visionMaxPages" class="text-sm font-medium">Max Pages</label>
+                                    <input type="number" 
+                                        id="visionMaxPages" 
+                                        name="visionMaxPages"
+                                        value="<%= config.VISION_MAX_PAGES %>"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="visionImageFormat" class="text-sm font-medium">Image Format</label>
+                                    <select id="visionImageFormat" 
+                                            name="visionImageFormat"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="png" <%= config.VISION_IMAGE_FORMAT === 'png' ? 'selected' : '' %>>PNG</option>
+                                        <option value="jpg" <%= config.VISION_IMAGE_FORMAT === 'jpg' ? 'selected' : '' %>>JPG</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="visionDpi" class="text-sm font-medium">DPI</label>
+                                    <input type="number" 
+                                        id="visionDpi" 
+                                        name="visionDpi"
+                                        value="<%= config.VISION_DPI %>"
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        min="72">
+                                </div>
+
                                 <!-- Token Limit Field -->
                                 <div class="space-y-2">
                                     <label for="tokenLimit">Token Limit</label>

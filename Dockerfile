@@ -13,7 +13,8 @@ RUN apt-get update && \
     make \
     g++ \
     curl \
-    wget && \
+    wget \
+    poppler-utils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

@@ -347,6 +347,57 @@
                                         </div>
                                     </div>
 
+                                    <!-- Vision Settings -->
+                                    <div class="form-group">
+                                        <label for="visionEnabled">Enable Vision Analysis</label>
+                                        <select id="visionEnabled" 
+                                                name="visionEnabled"
+                                                class="modern-input">
+                                            <option value="no" <%= config.VISION_ENABLED === 'no' ? 'selected' : '' %>>No</option>
+                                            <option value="yes" <%= config.VISION_ENABLED === 'yes' ? 'selected' : '' %>>Yes</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="visionIncludeText">Include Text Content</label>
+                                        <select id="visionIncludeText" 
+                                                name="visionIncludeText"
+                                                class="modern-input">
+                                            <option value="yes" <%= config.VISION_INCLUDE_TEXT === 'yes' ? 'selected' : '' %>>Yes</option>
+                                            <option value="no" <%= config.VISION_INCLUDE_TEXT === 'no' ? 'selected' : '' %>>No</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="visionMaxPages">Max Pages</label>
+                                        <input type="number" 
+                                               id="visionMaxPages" 
+                                               name="visionMaxPages"
+                                               value="<%= config.VISION_MAX_PAGES %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="visionImageFormat">Image Format</label>
+                                        <select id="visionImageFormat" 
+                                                name="visionImageFormat"
+                                                class="modern-input">
+                                            <option value="png" <%= config.VISION_IMAGE_FORMAT === 'png' ? 'selected' : '' %>>PNG</option>
+                                            <option value="jpg" <%= config.VISION_IMAGE_FORMAT === 'jpg' ? 'selected' : '' %>>JPG</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="visionDpi">DPI</label>
+                                        <input type="number" 
+                                               id="visionDpi" 
+                                               name="visionDpi"
+                                               value="<%= config.VISION_DPI %>"
+                                               class="modern-input"
+                                               min="72">
+                                    </div>
+
                                     <div class="form-group">
                                         <label for="tokenLimit">Token Limit</label>
                                         <input type="number" 

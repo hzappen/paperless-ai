@@ -3,7 +3,12 @@ const axios = require('axios');
 const config = require('../config/config');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const stream = require('stream');
+const { promisify } = require('util');
 const { parse, isValid, parseISO, format } = require('date-fns');
+
+const pipeline = promisify(stream.pipeline);
 
 class PaperlessService {
   constructor() {
@@ -46,6 +51,36 @@ class PaperlessService {
         console.log('[ERROR] headers:', error.response.headers);
       }
       return null; // Behalten Sie das return null bei, damit der Prozess weiterlaufen kann
+    }
+  }
+
+  async downloadDocument(documentId) {
+    this.initialize();
+    try {
+      const document = await this.getDocument(documentId);
+      const tempDir = path.join(os.tmpdir(), 'paperless-downloads');
+      await fs.promises.mkdir(tempDir, { recursive: true });
+
+      const safeName = document.original_filename || `document_${documentId}`;
+      const tempFilePath = path.join(tempDir, `${documentId}_${safeName}`);
+
+      const response = await this.client.get(`/documents/${documentId}/download/`, {
+        responseType: 'stream'
+      });
+
+      await pipeline(
+        response.data,
+        fs.createWriteStream(tempFilePath)
+      );
+
+      return {
+        filePath: tempFilePath,
+        filename: document.original_filename,
+        mimeType: document.mime_type
+      };
+    } catch (error) {
+      console.error(`[ERROR] downloading document ${documentId}:`, error.message);
+      throw error;
     }
   }
 

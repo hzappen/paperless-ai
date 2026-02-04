@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const setupService = require('../services/setupService.js');
 const paperlessService = require('../services/paperlessService.js');
+const visionService = require('../services/visionService');
 const openaiService = require('../services/openaiService.js');
 const ollamaService = require('../services/ollamaService.js');
 const azureService = require('../services/azureService.js');
@@ -1560,24 +1561,44 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
     console.log(`[DEBUG] Document ${doc.id} rights for AI User - processed`);
   }
 
-  let [content, originalData] = await Promise.all([
-    paperlessService.getDocumentContent(doc.id),
-    paperlessService.getDocument(doc.id)
-  ]);
+  const aiService = AIServiceFactory.getService();
+  const useVision = config.vision?.enabled === 'yes';
+  let originalData = await paperlessService.getDocument(doc.id);
+  let content = '';
+  let visionImages = [];
 
-  if (!content || !content.length >= 10) {
-    console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
-    return null;
-  }
-
-  if (content.length > 50000) {
-    content = content.substring(0, 50000);
+  if (useVision) {
+    if (config.aiProvider !== 'custom') {
+      throw new Error('Vision mode requires custom AI provider');
+    }
+    visionImages = await visionService.getDocumentImages(doc.id);
+    if (!visionImages || visionImages.length === 0) {
+      console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
+      return null;
+    }
+    if (config.vision.includeText === 'yes') {
+      content = await paperlessService.getDocumentContent(doc.id);
+      if (content.length > 50000) {
+        content = content.substring(0, 50000);
+      }
+    }
+  } else {
+    content = await paperlessService.getDocumentContent(doc.id);
+    if (!content || !content.length >= 10) {
+      console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
+      return null;
+    }
+    if (content.length > 50000) {
+      content = content.substring(0, 50000);
+    }
   }
 
   // Prepare options for AI service
   const options = {
     restrictToExistingTags: config.restrictToExistingTags === 'yes',
-    restrictToExistingCorrespondents: config.restrictToExistingCorrespondents === 'yes'
+    restrictToExistingCorrespondents: config.restrictToExistingCorrespondents === 'yes',
+    visionImages,
+    visionIncludeText: config.vision?.includeText === 'yes'
   };
 
   // Get external API data if enabled
@@ -1594,7 +1615,6 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
     }
   }
 
-  const aiService = AIServiceFactory.getService();
   let analysis;
   if(customPrompt) {
     console.log('[DEBUG] Starting document analysis with custom prompt');
@@ -1896,6 +1916,11 @@ router.get('/setup', async (req, res) => {
       AI_PROCESSED_TAG_NAME: process.env.AI_PROCESSED_TAG_NAME || 'ai-processed',
       USE_PROMPT_TAGS: process.env.USE_PROMPT_TAGS || 'no',
       PROMPT_TAGS: normalizeArray(process.env.PROMPT_TAGS),
+      VISION_ENABLED: process.env.VISION_ENABLED || 'no',
+      VISION_MAX_PAGES: process.env.VISION_MAX_PAGES || '1',
+      VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
+      VISION_DPI: process.env.VISION_DPI || '150',
+      VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes',
       PAPERLESS_AI_VERSION: configFile.PAPERLESS_AI_VERSION || ' ',
       PROCESS_ONLY_NEW_DOCUMENTS: process.env.PROCESS_ONLY_NEW_DOCUMENTS || 'yes',
       USE_EXISTING_DATA: process.env.USE_EXISTING_DATA || 'no',
@@ -2694,6 +2719,11 @@ router.get('/settings', async (req, res) => {
     AI_PROCESSED_TAG_NAME: process.env.AI_PROCESSED_TAG_NAME || 'ai-processed',
     USE_PROMPT_TAGS: process.env.USE_PROMPT_TAGS || 'no',
     PROMPT_TAGS: normalizeArray(process.env.PROMPT_TAGS),
+    VISION_ENABLED: process.env.VISION_ENABLED || 'no',
+    VISION_MAX_PAGES: process.env.VISION_MAX_PAGES || '1',
+    VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
+    VISION_DPI: process.env.VISION_DPI || '150',
+    VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes',
     PAPERLESS_AI_VERSION: configFile.PAPERLESS_AI_VERSION || ' ',
     PROCESS_ONLY_NEW_DOCUMENTS: process.env.PROCESS_ONLY_NEW_DOCUMENTS || ' ',
     USE_EXISTING_DATA: process.env.USE_EXISTING_DATA || 'no',
@@ -3618,7 +3648,12 @@ router.post('/setup', express.json(), async (req, res) => {
       azureEndpoint,
       azureApiKey,
       azureDeploymentName,
-      azureApiVersion
+      azureApiVersion,
+      visionEnabled,
+      visionMaxPages,
+      visionImageFormat,
+      visionDpi,
+      visionIncludeText
     } = req.body;
 
     // Log setup request with sensitive data redacted
@@ -3721,6 +3756,11 @@ router.post('/setup', express.json(), async (req, res) => {
       AI_PROCESSED_TAG_NAME: aiTagName || 'ai-processed',
       USE_PROMPT_TAGS: usePromptTags || 'no',
       PROMPT_TAGS: normalizeArray(promptTags),
+      VISION_ENABLED: visionEnabled || 'no',
+      VISION_MAX_PAGES: visionMaxPages || '1',
+      VISION_IMAGE_FORMAT: visionImageFormat || 'png',
+      VISION_DPI: visionDpi || '150',
+      VISION_INCLUDE_TEXT: visionIncludeText || 'yes',
       USE_EXISTING_DATA: useExistingData || 'no',
       API_KEY: apiToken,
       JWT_SECRET: jwtToken,
@@ -4025,7 +4065,12 @@ router.post('/settings', express.json(), async (req, res) => {
       azureEndpoint,
       azureApiKey,
       azureDeploymentName,
-      azureApiVersion
+      azureApiVersion,
+      visionEnabled,
+      visionMaxPages,
+      visionImageFormat,
+      visionDpi,
+      visionIncludeText
     } = req.body;
 
     //replace equal char in system prompt
@@ -4078,7 +4123,12 @@ router.post('/settings', express.json(), async (req, res) => {
       EXTERNAL_API_HEADERS: process.env.EXTERNAL_API_HEADERS || '{}',
       EXTERNAL_API_BODY: process.env.EXTERNAL_API_BODY || '{}',
       EXTERNAL_API_TIMEOUT: process.env.EXTERNAL_API_TIMEOUT || '5000',
-      EXTERNAL_API_TRANSFORM: process.env.EXTERNAL_API_TRANSFORM || ''
+      EXTERNAL_API_TRANSFORM: process.env.EXTERNAL_API_TRANSFORM || '',
+      VISION_ENABLED: process.env.VISION_ENABLED || 'no',
+      VISION_MAX_PAGES: process.env.VISION_MAX_PAGES || '1',
+      VISION_IMAGE_FORMAT: process.env.VISION_IMAGE_FORMAT || 'png',
+      VISION_DPI: process.env.VISION_DPI || '150',
+      VISION_INCLUDE_TEXT: process.env.VISION_INCLUDE_TEXT || 'yes'
     };
 
     // Process custom fields
@@ -4201,6 +4251,11 @@ router.post('/settings', express.json(), async (req, res) => {
     if (customBaseUrl) updatedConfig.CUSTOM_BASE_URL = customBaseUrl;
     if (customModel) updatedConfig.CUSTOM_MODEL = customModel;
     if (disableAutomaticProcessing) updatedConfig.DISABLE_AUTOMATIC_PROCESSING = disableAutomaticProcessing;
+    if (visionEnabled) updatedConfig.VISION_ENABLED = visionEnabled;
+    if (visionMaxPages) updatedConfig.VISION_MAX_PAGES = visionMaxPages;
+    if (visionImageFormat) updatedConfig.VISION_IMAGE_FORMAT = visionImageFormat;
+    if (visionDpi) updatedConfig.VISION_DPI = visionDpi;
+    if (visionIncludeText) updatedConfig.VISION_INCLUDE_TEXT = visionIncludeText;
 
     // Update custom fields
     if (processedCustomFields.length > 0 || customFields) {

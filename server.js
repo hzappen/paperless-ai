@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const config = require('./config/config');
 const paperlessService = require('./services/paperlessService');
 const AIServiceFactory = require('./services/aiServiceFactory');
+const visionService = require('./services/visionService');
 const documentModel = require('./models/document');
 const setupService = require('./services/setupService');
 const setupRoutes = require('./routes/setup');
@@ -196,22 +197,50 @@ async function processDocument(doc, existingTags, existingCorrespondentList, exi
     console.log(`[DEBUG] Document ${doc.id} rights for AI User - processed`);
   }
 
-  let [content, originalData] = await Promise.all([
-    paperlessService.getDocumentContent(doc.id),
-    paperlessService.getDocument(doc.id)
-  ]);
-
-  if (!content || !content.length >= 10) {
-    console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
-    return null;
-  }
-
-  if (content.length > 50000) {
-    content = content.substring(0, 50000);
-  }
-
   const aiService = AIServiceFactory.getService();
-  const analysis = await aiService.analyzeDocument(content, existingTags, existingCorrespondentList, existingDocumentTypesList, doc.id);
+  const useVision = config.vision?.enabled === 'yes';
+  let originalData = await paperlessService.getDocument(doc.id);
+  let content = '';
+  let visionImages = [];
+
+  if (useVision) {
+    if (config.aiProvider !== 'custom') {
+      throw new Error('Vision mode requires custom AI provider');
+    }
+    visionImages = await visionService.getDocumentImages(doc.id);
+    if (!visionImages || visionImages.length === 0) {
+      console.log(`[DEBUG] Document ${doc.id} has no vision images, skipping analysis`);
+      return null;
+    }
+    if (config.vision.includeText === 'yes') {
+      content = await paperlessService.getDocumentContent(doc.id);
+      if (content.length > 50000) {
+        content = content.substring(0, 50000);
+      }
+    }
+  } else {
+    content = await paperlessService.getDocumentContent(doc.id);
+    if (!content || !content.length >= 10) {
+      console.log(`[DEBUG] Document ${doc.id} has no content, skipping analysis`);
+      return null;
+    }
+    if (content.length > 50000) {
+      content = content.substring(0, 50000);
+    }
+  }
+
+  const analysis = await aiService.analyzeDocument(
+    content,
+    existingTags,
+    existingCorrespondentList,
+    existingDocumentTypesList,
+    doc.id,
+    null,
+    {
+      visionImages,
+      visionIncludeText: config.vision?.includeText === 'yes'
+    }
+  );
   console.log('Repsonse from AI service:', analysis);
   if (analysis.error) {
     throw new Error(`[ERROR] Document analysis failed: ${analysis.error}`);

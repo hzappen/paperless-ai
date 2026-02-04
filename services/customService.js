@@ -164,19 +164,39 @@ class CustomOpenAIService {
       console.log(`[DEBUG] External API data: ${validatedExternalApiData ? 'included' : 'none'}`);
 
       const truncatedContent = await truncateToTokenLimit(content, availableTokens, model);
+      const visionImages = Array.isArray(options.visionImages) ? options.visionImages : [];
+      const visionIncludeText = options.visionIncludeText !== false;
+      let userContent;
 
-      // console.log('######################################################################');
-      // console.log(`[DEBUG] Content length: ${content.length}, Truncated content length: ${truncatedContent.length}`);
-      // console.log(`[DEBUG] Truncated content: ${truncatedContent}`);
-      // console.log(`[DEBUG] System prompt: ${systemPrompt}`);
-      // console.log(`[DEBUG] Prompt tags: ${promptTags}`);
-      // console.log(`[DEBUG] Model: ${model}`);
-      // console.log(`[DEBUG] Custom fields: ${customFieldsStr}`);
-      // console.log(`[DEBUG] Existing tags: ${existingTagsList}`);
-      // console.log(`[DEBUG] Existing correspondents: ${existingCorrespondentList}`);
-      // console.log(`[DEBUG] Custom prompt: ${customPrompt}`);
-      // console.log(`[DEBUG] External API data: ${validatedExternalApiData}`);
-      // console.log('######################################################################');
+      if (visionImages.length > 0) {
+        userContent = [];
+        const textBlock = visionIncludeText && truncatedContent
+          ? `Document text content:\n${truncatedContent}`
+          : 'Analyze the following document images.';
+        userContent.push({ type: "text", text: textBlock });
+        for (const imageUrl of visionImages) {
+          userContent.push({
+            type: "image_url",
+            image_url: { url: imageUrl }
+          });
+        }
+      } else {
+        userContent = truncatedContent;
+      }
+
+      console.log('######################################################################');
+      console.log(`[DEBUG] Content length: ${content.length}, Truncated content length: ${truncatedContent.length}`);
+      console.log(`[DEBUG] Truncated content: ${truncatedContent}`);
+      console.log(`[DEBUG] User content: ${userContent}`);
+      console.log(`[DEBUG] System prompt: ${systemPrompt}`);
+      console.log(`[DEBUG] Prompt tags: ${promptTags}`);
+      console.log(`[DEBUG] Model: ${model}`);
+      console.log(`[DEBUG] Custom fields: ${customFieldsStr}`);
+      console.log(`[DEBUG] Existing tags: ${existingTagsList}`);
+      console.log(`[DEBUG] Existing correspondents: ${existingCorrespondentList}`);
+      console.log(`[DEBUG] Custom prompt: ${customPrompt}`);
+      console.log(`[DEBUG] External API data: ${validatedExternalApiData}`);
+      console.log('######################################################################');
 
 
       const response = await this.client.chat.completions.create({
@@ -188,7 +208,7 @@ class CustomOpenAIService {
           },
           {
             role: "user",
-            content: truncatedContent
+            content: userContent
           }
         ],
         temperature: 0.3,

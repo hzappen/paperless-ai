@@ -90,6 +90,13 @@ module.exports = {
   },
   customFields: process.env.CUSTOM_FIELDS || '',
   aiProvider: process.env.AI_PROVIDER || 'openai',
+  vision: {
+    enabled: parseEnvBoolean(process.env.VISION_ENABLED, 'no'),
+    maxPages: parseInt(process.env.VISION_MAX_PAGES || '1', 10),
+    imageFormat: process.env.VISION_IMAGE_FORMAT || 'png',
+    dpi: parseInt(process.env.VISION_DPI || '150', 10),
+    includeText: parseEnvBoolean(process.env.VISION_INCLUDE_TEXT, 'yes')
+  },
   scanInterval: process.env.SCAN_INTERVAL || '*/30 * * * *',
   useExistingData: process.env.USE_EXISTING_DATA || 'no',
   // Add limit functions to config
