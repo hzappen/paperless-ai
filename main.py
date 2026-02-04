@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any, Union, Tuple
 import time
 import traceback
+import tempfile
 
 import requests
 import uvicorn
@@ -218,16 +219,35 @@ def _load_ocr_model():
     if _ocr_model is not None and _ocr_tokenizer is not None:
         return _ocr_model, _ocr_tokenizer
 
+    if not torch.cuda.is_available():
+        raise NotImplementedError("OCR model requires a CUDA-capable GPU, but none was detected.")
+
+    os.environ.setdefault("UNSLOTH_WARN_UNINITIALIZED", "0")
+
+    # Import lazily to avoid impacting startup when OCR is disabled
+    from unsloth import FastVisionModel
+    from transformers import AutoModel
+    from huggingface_hub import snapshot_download
+
     model_id = os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2')
+    local_dir = os.getenv('OCR_MODEL_DIR', './data/ocr_model')
+    os.makedirs(local_dir, exist_ok=True)
+
+    snapshot_download(model_id, local_dir=local_dir)
+
     _ocr_model, _ocr_tokenizer = FastVisionModel.from_pretrained(
-        model_id,
-        max_seq_length=4096,
-        load_in_4bit=True
+        local_dir,
+        load_in_4bit=False,
+        auto_model=AutoModel,
+        trust_remote_code=True,
+        unsloth_force_compile=True,
+        use_gradient_checkpointing="unsloth"
     )
     FastVisionModel.for_inference(_ocr_model)
     return _ocr_model, _ocr_tokenizer
 
-def _decode_image_from_base64(data_url: str) -> Image.Image:
+def _decode_image_from_base64(data_url: str):
+    from PIL import Image
     if data_url.startswith('data:'):
         _, b64data = data_url.split(',', 1)
     else:
@@ -1845,37 +1865,36 @@ async def ocr_extract(request: OcrRequest):
     try:
         model, tokenizer = _load_ocr_model()
         prompt = request.prompt or os.getenv('OCR_PROMPT', 'Convert to markdown.')
-        max_new_tokens = request.max_new_tokens or int(os.getenv('OCR_MAX_NEW_TOKENS', '4096'))
+        base_size = int(os.getenv('OCR_BASE_SIZE', '1024'))
+        image_size = int(os.getenv('OCR_IMAGE_SIZE', '640'))
+        crop_mode = os.getenv('OCR_CROP_MODE', 'true').lower() in ['true', '1', 'yes']
+        save_results = os.getenv('OCR_SAVE_RESULTS', 'false').lower() in ['true', '1', 'yes']
         pages = []
 
         for idx, image_data in enumerate(request.images, start=1):
             image = _decode_image_from_base64(image_data)
-            messages = [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image", "image": image}
-                ]
-            }]
-
-            input_text = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
-            inputs = tokenizer(
-                image,
-                input_text,
-                add_special_tokens=False,
-                return_tensors="pt"
-            ).to(model.device)
-
-            output = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                temperature=0.0,
-                do_sample=False
-            )
-
-            input_length = inputs["input_ids"].shape[1]
-            decoded = tokenizer.decode(output[0][input_length:], skip_special_tokens=True)
-            pages.append({"page": idx, "text": decoded.strip()})
+            with tempfile.TemporaryDirectory() as temp_dir:
+                image_path = os.path.join(temp_dir, f"page_{idx}.png")
+                image.save(image_path)
+                infer_prompt = f"<image>\\n{prompt}"
+                result = model.infer(
+                    tokenizer,
+                    prompt=infer_prompt,
+                    image_file=image_path,
+                    output_path=temp_dir,
+                    base_size=base_size,
+                    image_size=image_size,
+                    crop_mode=crop_mode,
+                    save_results=save_results,
+                    test_compress=False
+                )
+                if isinstance(result, dict) and "text" in result:
+                    text = result["text"]
+                elif isinstance(result, str):
+                    text = result
+                else:
+                    text = str(result)
+                pages.append({"page": idx, "text": text.strip()})
 
         combined = "\n\n".join(
             [f"--- Page {page['page']} ---\n{page['text']}" for page in pages if page.get("text")]
@@ -1886,6 +1905,25 @@ async def ocr_extract(request: OcrRequest):
         logger.error(f"OCR error: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ocr/status")
+async def ocr_status():
+    status = {
+        "cuda_available": torch.cuda.is_available(),
+        "model_loaded": _ocr_model is not None and _ocr_tokenizer is not None,
+        "model_id": os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2'),
+        "model_dir": os.getenv('OCR_MODEL_DIR', './data/ocr_model'),
+        "torch_version": torch.__version__
+    }
+
+    if torch.cuda.is_available():
+        try:
+            status["cuda_device"] = torch.cuda.get_device_name(0)
+            status["cuda_device_count"] = torch.cuda.device_count()
+        except Exception as e:
+            status["cuda_error"] = str(e)
+
+    return status
 
 @app.get("/indexing/status", response_model=IndexingStatus)
 async def get_indexing_status():
