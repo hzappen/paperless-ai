@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from tqdm import tqdm
+from unsloth import FastVisionModel
 import torch
 from sentence_transformers import SentenceTransformer, CrossEncoder
 import chromadb
@@ -27,7 +28,6 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from PIL import Image
-from unsloth import FastVisionModel
 
 # Configure logging
 logging.basicConfig(
