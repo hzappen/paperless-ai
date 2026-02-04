@@ -222,6 +222,10 @@ def _load_ocr_model():
     if not torch.cuda.is_available():
         raise NotImplementedError("OCR model requires a CUDA-capable GPU, but none was detected.")
 
+    device_index = int(os.getenv('OCR_CUDA_DEVICE', '0'))
+    torch.cuda.set_device(device_index)
+    device = f"cuda:{device_index}"
+
     os.environ.setdefault("UNSLOTH_WARN_UNINITIALIZED", "0")
 
     # Import lazily to avoid impacting startup when OCR is disabled
@@ -243,6 +247,7 @@ def _load_ocr_model():
         unsloth_force_compile=True,
         use_gradient_checkpointing="unsloth"
     )
+    _ocr_model = _ocr_model.to(device)
     FastVisionModel.for_inference(_ocr_model)
     return _ocr_model, _ocr_tokenizer
 
@@ -1913,7 +1918,8 @@ async def ocr_status():
         "model_loaded": _ocr_model is not None and _ocr_tokenizer is not None,
         "model_id": os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2'),
         "model_dir": os.getenv('OCR_MODEL_DIR', './data/ocr_model'),
-        "torch_version": torch.__version__
+        "torch_version": torch.__version__,
+        "ocr_cuda_device": os.getenv('OCR_CUDA_DEVICE', '0')
     }
 
     if torch.cuda.is_available():
