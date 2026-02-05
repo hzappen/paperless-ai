@@ -101,7 +101,7 @@ module.exports = {
     enabled: parseEnvBoolean(process.env.OCR_ENABLED, 'no'),
     overwriteContent: parseEnvBoolean(process.env.OCR_OVERWRITE_CONTENT, 'no'),
     serviceUrl: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
-    modelId: process.env.OCR_MODEL_ID || 'unsloth/DeepSeek-OCR-2',
+    modelId: process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
     prompt: process.env.OCR_PROMPT || '<image>\n<|grounding|>Convert the document to markdown.',
     maxPages: parseInt(process.env.OCR_MAX_PAGES || '50', 10),
     imageFormat: process.env.OCR_IMAGE_FORMAT || 'png',
