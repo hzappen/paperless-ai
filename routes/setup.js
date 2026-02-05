@@ -4172,7 +4172,8 @@ router.post('/settings', express.json(), async (req, res) => {
       ocrImageSize,
       ocrCropMode,
       ocrSaveResults,
-      ocrCudaDevice
+      ocrCudaDevice,
+      ocrEnableDeepseek
     } = req.body;
 
     //replace equal char in system prompt
