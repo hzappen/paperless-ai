@@ -450,7 +450,14 @@
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="ocrPrompt">OCR Prompt</label>
+                                        <div class="flex items-center justify-between gap-2">
+                                            <label for="ocrPrompt">OCR Prompt</label>
+                                            <button type="button"
+                                                    id="ocrPromptReset"
+                                                    class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50">
+                                                Reset to default
+                                            </button>
+                                        </div>
                                         <input type="text" 
                                                id="ocrPrompt" 
                                                name="ocrPrompt"
@@ -479,7 +486,7 @@
                                         </select>
                                     </div>
                                     <script>
-                                        (function () {
+                                        document.addEventListener('DOMContentLoaded', () => {
                                             const modelSelect = document.getElementById('ocrModelId');
                                             const promptInput = document.getElementById('ocrPrompt');
                                             if (!modelSelect || !promptInput) return;
@@ -487,13 +494,18 @@
                                                 'deepseek-ai/DeepSeek-OCR-2': '<image>\\n<|grounding|>Convert the document to markdown.',
                                                 'zai-org/GLM-OCR': 'Text Recognition:'
                                             };
-                                            modelSelect.addEventListener('change', () => {
+                                            const applyDefault = () => {
                                                 const value = modelSelect.value;
                                                 if (defaults[value]) {
                                                     promptInput.value = defaults[value];
                                                 }
-                                            });
-                                        })();
+                                            };
+                                            modelSelect.addEventListener('change', applyDefault);
+                                            const resetBtn = document.getElementById('ocrPromptReset');
+                                            if (resetBtn) {
+                                                resetBtn.addEventListener('click', applyDefault);
+                                            }
+                                        });
                                     </script>
 
                                     <div class="form-group">
