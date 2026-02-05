@@ -460,6 +460,106 @@
                                     </div>
 
                                     <div class="form-group">
+                                        <label for="ocrServiceUrl">OCR Service URL</label>
+                                        <input type="text"
+                                               id="ocrServiceUrl"
+                                               name="ocrServiceUrl"
+                                               value="<%= config.OCR_SERVICE_URL %>"
+                                               class="modern-input"
+                                               placeholder="http://localhost:8000">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrModelId">OCR Model ID</label>
+                                        <input type="text"
+                                               id="ocrModelId"
+                                               name="ocrModelId"
+                                               value="<%= config.OCR_MODEL_ID %>"
+                                               class="modern-input"
+                                               placeholder="deepseek-ai/DeepSeek-OCR-2">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrMaxNewTokens">OCR Max New Tokens</label>
+                                        <input type="number"
+                                               id="ocrMaxNewTokens"
+                                               name="ocrMaxNewTokens"
+                                               value="<%= config.OCR_MAX_NEW_TOKENS %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrMaxChars">OCR Max Chars</label>
+                                        <input type="number"
+                                               id="ocrMaxChars"
+                                               name="ocrMaxChars"
+                                               value="<%= config.OCR_MAX_CHARS %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrTimeoutMs">OCR Timeout (ms)</label>
+                                        <input type="number"
+                                               id="ocrTimeoutMs"
+                                               name="ocrTimeoutMs"
+                                               value="<%= config.OCR_TIMEOUT_MS %>"
+                                               class="modern-input"
+                                               min="1000">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrBaseSize">OCR Base Size</label>
+                                        <input type="number"
+                                               id="ocrBaseSize"
+                                               name="ocrBaseSize"
+                                               value="<%= config.OCR_BASE_SIZE %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrImageSize">OCR Image Size</label>
+                                        <input type="number"
+                                               id="ocrImageSize"
+                                               name="ocrImageSize"
+                                               value="<%= config.OCR_IMAGE_SIZE %>"
+                                               class="modern-input"
+                                               min="1">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrCropMode">OCR Crop Mode</label>
+                                        <select id="ocrCropMode"
+                                                name="ocrCropMode"
+                                                class="modern-input">
+                                            <option value="true" <%= String(config.OCR_CROP_MODE) === 'true' ? 'selected' : '' %>>True</option>
+                                            <option value="false" <%= String(config.OCR_CROP_MODE) === 'false' ? 'selected' : '' %>>False</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrSaveResults">OCR Save Results</label>
+                                        <select id="ocrSaveResults"
+                                                name="ocrSaveResults"
+                                                class="modern-input">
+                                            <option value="true" <%= String(config.OCR_SAVE_RESULTS) === 'true' ? 'selected' : '' %>>True</option>
+                                            <option value="false" <%= String(config.OCR_SAVE_RESULTS) === 'false' ? 'selected' : '' %>>False</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrCudaDevice">OCR CUDA Device</label>
+                                        <input type="number"
+                                               id="ocrCudaDevice"
+                                               name="ocrCudaDevice"
+                                               value="<%= config.OCR_CUDA_DEVICE %>"
+                                               class="modern-input"
+                                               min="0">
+                                    </div>
+
+                                    <div class="form-group">
                                         <label for="tokenLimit">Token Limit</label>
                                         <input type="number" 
                                                id="tokenLimit" 

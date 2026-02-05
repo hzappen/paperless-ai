@@ -3711,7 +3711,14 @@ router.post('/setup', express.json(), async (req, res) => {
       ocrPrompt,
       ocrMaxNewTokens,
       ocrMaxChars,
-      ocrTimeoutMs
+      ocrTimeoutMs,
+      ocrServiceUrl,
+      ocrModelId,
+      ocrBaseSize,
+      ocrImageSize,
+      ocrCropMode,
+      ocrSaveResults,
+      ocrCudaDevice
     } = req.body;
 
     // Log setup request with sensitive data redacted
@@ -3821,8 +3828,8 @@ router.post('/setup', express.json(), async (req, res) => {
       VISION_INCLUDE_TEXT: visionIncludeText || 'yes',
       OCR_ENABLED: ocrEnabled || 'no',
       OCR_OVERWRITE_CONTENT: ocrOverwriteContent || 'no',
-      OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
-      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
+      OCR_SERVICE_URL: ocrServiceUrl || process.env.OCR_SERVICE_URL || 'http://localhost:8000',
+      OCR_MODEL_ID: ocrModelId || process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
       OCR_PROMPT: ocrPrompt || '<image>\n<|grounding|>Convert the document to markdown.',
       OCR_MAX_PAGES: ocrMaxPages || '50',
       OCR_IMAGE_FORMAT: ocrImageFormat || 'png',
@@ -3830,6 +3837,11 @@ router.post('/setup', express.json(), async (req, res) => {
       OCR_MAX_NEW_TOKENS: ocrMaxNewTokens || '4096',
       OCR_MAX_CHARS: ocrMaxChars || '50000',
       OCR_TIMEOUT_MS: ocrTimeoutMs || '120000',
+      OCR_BASE_SIZE: ocrBaseSize || '1024',
+      OCR_IMAGE_SIZE: ocrImageSize || '768',
+      OCR_CROP_MODE: ocrCropMode || 'true',
+      OCR_SAVE_RESULTS: ocrSaveResults || 'false',
+      OCR_CUDA_DEVICE: ocrCudaDevice || '0',
       USE_EXISTING_DATA: useExistingData || 'no',
       API_KEY: apiToken,
       JWT_SECRET: jwtToken,
@@ -4148,7 +4160,14 @@ router.post('/settings', express.json(), async (req, res) => {
       ocrPrompt,
       ocrMaxNewTokens,
       ocrMaxChars,
-      ocrTimeoutMs
+      ocrTimeoutMs,
+      ocrServiceUrl,
+      ocrModelId,
+      ocrBaseSize,
+      ocrImageSize,
+      ocrCropMode,
+      ocrSaveResults,
+      ocrCudaDevice
     } = req.body;
 
     //replace equal char in system prompt
@@ -4217,7 +4236,12 @@ router.post('/settings', express.json(), async (req, res) => {
       OCR_DPI: process.env.OCR_DPI || '150',
       OCR_MAX_NEW_TOKENS: process.env.OCR_MAX_NEW_TOKENS || '4096',
       OCR_MAX_CHARS: process.env.OCR_MAX_CHARS || '50000',
-      OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000'
+      OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000',
+      OCR_BASE_SIZE: process.env.OCR_BASE_SIZE || '1024',
+      OCR_IMAGE_SIZE: process.env.OCR_IMAGE_SIZE || '768',
+      OCR_CROP_MODE: process.env.OCR_CROP_MODE || 'true',
+      OCR_SAVE_RESULTS: process.env.OCR_SAVE_RESULTS || 'false',
+      OCR_CUDA_DEVICE: process.env.OCR_CUDA_DEVICE || '0'
     };
 
     // Process custom fields
@@ -4347,6 +4371,8 @@ router.post('/settings', express.json(), async (req, res) => {
     if (visionIncludeText) updatedConfig.VISION_INCLUDE_TEXT = visionIncludeText;
     if (ocrEnabled) updatedConfig.OCR_ENABLED = ocrEnabled;
     if (ocrOverwriteContent) updatedConfig.OCR_OVERWRITE_CONTENT = ocrOverwriteContent;
+    if (ocrServiceUrl) updatedConfig.OCR_SERVICE_URL = ocrServiceUrl;
+    if (ocrModelId) updatedConfig.OCR_MODEL_ID = ocrModelId;
     if (ocrPrompt) updatedConfig.OCR_PROMPT = ocrPrompt;
     if (ocrMaxPages) updatedConfig.OCR_MAX_PAGES = ocrMaxPages;
     if (ocrImageFormat) updatedConfig.OCR_IMAGE_FORMAT = ocrImageFormat;
@@ -4354,6 +4380,11 @@ router.post('/settings', express.json(), async (req, res) => {
     if (ocrMaxNewTokens) updatedConfig.OCR_MAX_NEW_TOKENS = ocrMaxNewTokens;
     if (ocrMaxChars) updatedConfig.OCR_MAX_CHARS = ocrMaxChars;
     if (ocrTimeoutMs) updatedConfig.OCR_TIMEOUT_MS = ocrTimeoutMs;
+    if (ocrBaseSize) updatedConfig.OCR_BASE_SIZE = ocrBaseSize;
+    if (ocrImageSize) updatedConfig.OCR_IMAGE_SIZE = ocrImageSize;
+    if (ocrCropMode) updatedConfig.OCR_CROP_MODE = ocrCropMode;
+    if (ocrSaveResults) updatedConfig.OCR_SAVE_RESULTS = ocrSaveResults;
+    if (ocrCudaDevice !== undefined && ocrCudaDevice !== null) updatedConfig.OCR_CUDA_DEVICE = ocrCudaDevice;
 
     // Update custom fields
     if (processedCustomFields.length > 0 || customFields) {

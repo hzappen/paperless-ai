@@ -523,6 +523,106 @@
                                            placeholder="<image>\n<|grounding|>Convert the document to markdown.">
                                 </div>
 
+                                <div class="space-y-2">
+                                    <label for="ocrServiceUrl" class="text-sm font-medium">OCR Service URL</label>
+                                    <input type="text"
+                                           id="ocrServiceUrl"
+                                           name="ocrServiceUrl"
+                                           value="<%= config.OCR_SERVICE_URL %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="http://localhost:8000">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrModelId" class="text-sm font-medium">OCR Model ID</label>
+                                    <input type="text"
+                                           id="ocrModelId"
+                                           name="ocrModelId"
+                                           value="<%= config.OCR_MODEL_ID %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="deepseek-ai/DeepSeek-OCR-2">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrMaxNewTokens" class="text-sm font-medium">OCR Max New Tokens</label>
+                                    <input type="number"
+                                           id="ocrMaxNewTokens"
+                                           name="ocrMaxNewTokens"
+                                           value="<%= config.OCR_MAX_NEW_TOKENS %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrMaxChars" class="text-sm font-medium">OCR Max Chars</label>
+                                    <input type="number"
+                                           id="ocrMaxChars"
+                                           name="ocrMaxChars"
+                                           value="<%= config.OCR_MAX_CHARS %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrTimeoutMs" class="text-sm font-medium">OCR Timeout (ms)</label>
+                                    <input type="number"
+                                           id="ocrTimeoutMs"
+                                           name="ocrTimeoutMs"
+                                           value="<%= config.OCR_TIMEOUT_MS %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="1000">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrBaseSize" class="text-sm font-medium">OCR Base Size</label>
+                                    <input type="number"
+                                           id="ocrBaseSize"
+                                           name="ocrBaseSize"
+                                           value="<%= config.OCR_BASE_SIZE %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrImageSize" class="text-sm font-medium">OCR Image Size</label>
+                                    <input type="number"
+                                           id="ocrImageSize"
+                                           name="ocrImageSize"
+                                           value="<%= config.OCR_IMAGE_SIZE %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="1">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrCropMode" class="text-sm font-medium">OCR Crop Mode</label>
+                                    <select id="ocrCropMode"
+                                            name="ocrCropMode"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="true" <%= String(config.OCR_CROP_MODE) === 'true' ? 'selected' : '' %>>True</option>
+                                        <option value="false" <%= String(config.OCR_CROP_MODE) === 'false' ? 'selected' : '' %>>False</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrSaveResults" class="text-sm font-medium">OCR Save Results</label>
+                                    <select id="ocrSaveResults"
+                                            name="ocrSaveResults"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="true" <%= String(config.OCR_SAVE_RESULTS) === 'true' ? 'selected' : '' %>>True</option>
+                                        <option value="false" <%= String(config.OCR_SAVE_RESULTS) === 'false' ? 'selected' : '' %>>False</option>
+                                    </select>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrCudaDevice" class="text-sm font-medium">OCR CUDA Device</label>
+                                    <input type="number"
+                                           id="ocrCudaDevice"
+                                           name="ocrCudaDevice"
+                                           value="<%= config.OCR_CUDA_DEVICE %>"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                           min="0">
+                                </div>
+
                                 <!-- Token Limit Field -->
                                 <div class="space-y-2">
                                     <label for="tokenLimit">Token Limit</label>
