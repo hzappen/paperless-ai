@@ -10,16 +10,17 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any, Union, Tuple
 import time
 import traceback
-import tempfile
 
 import requests
+import re
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from tqdm import tqdm
-from unsloth import FastVisionModel
+from contextlib import asynccontextmanager
+from transformers import AutoModel, AutoTokenizer
 import torch
 from sentence_transformers import SentenceTransformer, CrossEncoder
 import chromadb
@@ -110,6 +111,27 @@ class OcrRequest(BaseModel):
     images: List[str]
     prompt: Optional[str] = None
     max_new_tokens: Optional[int] = None
+
+def _clean_ocr_output(text: str) -> str:
+    if not text:
+        return ""
+
+    # Remove grounding tags but keep inner text
+    text = re.sub(r'<\|ref\|>(.*?)<\|/ref\|>', r'\1', text)
+
+    # Remove detection tags
+    text = re.sub(r'<\|det\|>\[\[.*?\]\]<\|/det\|>', '', text)
+
+    block_labels = [
+        "text", "title", "sub_title", "table", "figure",
+        "equation", "header", "footer", "caption", "reference"
+    ]
+    for label in block_labels:
+        text = re.sub(rf'^{label}\s*$', '', text, flags=re.MULTILINE | re.IGNORECASE)
+        text = re.sub(rf'^{label}\n', '', text, flags=re.MULTILINE | re.IGNORECASE)
+
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 # Response models
 class SearchResult(BaseModel):
@@ -213,9 +235,17 @@ class GlobalState:
 # OCR model cache
 _ocr_model = None
 _ocr_tokenizer = None
+_ocr_load_error = None
+
+def _resolve_ocr_dtype():
+    if torch.cuda.is_available():
+        if torch.cuda.is_bf16_supported():
+            return torch.bfloat16
+        return torch.float16
+    return torch.float32
 
 def _load_ocr_model():
-    global _ocr_model, _ocr_tokenizer
+    global _ocr_model, _ocr_tokenizer, _ocr_load_error
     if _ocr_model is not None and _ocr_tokenizer is not None:
         return _ocr_model, _ocr_tokenizer
 
@@ -226,29 +256,21 @@ def _load_ocr_model():
     torch.cuda.set_device(device_index)
     device = f"cuda:{device_index}"
 
-    os.environ.setdefault("UNSLOTH_WARN_UNINITIALIZED", "0")
+    model_id = os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2')
+    dtype = _resolve_ocr_dtype()
 
-    # Import lazily to avoid impacting startup when OCR is disabled
-    from unsloth import FastVisionModel
-    from transformers import AutoModel
-    from huggingface_hub import snapshot_download
+    try:
+        _ocr_tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+        _ocr_model = AutoModel.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            use_safetensors=True
+        ).eval().to(device).to(dtype)
+        _ocr_load_error = None
+    except Exception as e:
+        _ocr_load_error = str(e)
+        raise
 
-    model_id = os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2')
-    local_dir = os.getenv('OCR_MODEL_DIR', './data/ocr_model')
-    os.makedirs(local_dir, exist_ok=True)
-
-    snapshot_download(model_id, local_dir=local_dir)
-
-    _ocr_model, _ocr_tokenizer = FastVisionModel.from_pretrained(
-        local_dir,
-        load_in_4bit=False,
-        auto_model=AutoModel,
-        trust_remote_code=True,
-        unsloth_force_compile=True,
-        use_gradient_checkpointing="unsloth"
-    )
-    _ocr_model = _ocr_model.to(device)
-    FastVisionModel.for_inference(_ocr_model)
     return _ocr_model, _ocr_tokenizer
 
 def _decode_image_from_base64(data_url: str):
@@ -1506,7 +1528,16 @@ def run_indexing(force_update=False, check_new=False):
         logger.error(traceback.format_exc())
 
 # FastAPI Application
-app = FastAPI(title="RAGZ Document Search API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv('OCR_ENABLED', 'no').lower() in ['yes', 'true', '1']:
+        logger.info("Loading OCR model on startup...")
+        _load_ocr_model()
+        logger.info("OCR model loaded.")
+    yield
+
+app = FastAPI(lifespan=lifespan, title="RAGZ Document Search API")
 
 # Add CORS middleware
 app.add_middleware(
@@ -1871,7 +1902,7 @@ async def ocr_extract(request: OcrRequest):
         model, tokenizer = _load_ocr_model()
         prompt = request.prompt or os.getenv('OCR_PROMPT', '<image>\n<|grounding|>Convert the document to markdown.')
         base_size = int(os.getenv('OCR_BASE_SIZE', '1024'))
-        image_size = int(os.getenv('OCR_IMAGE_SIZE', '640'))
+        image_size = int(os.getenv('OCR_IMAGE_SIZE', '768'))
         crop_mode = os.getenv('OCR_CROP_MODE', 'true').lower() in ['true', '1', 'yes']
         save_results = os.getenv('OCR_SAVE_RESULTS', 'false').lower() in ['true', '1', 'yes']
         pages = []
@@ -1890,7 +1921,7 @@ async def ocr_extract(request: OcrRequest):
                     image_size=image_size,
                     crop_mode=crop_mode,
                     save_results=save_results,
-                    test_compress=False
+                    eval_mode=True
                 )
                 if isinstance(result, dict) and "text" in result:
                     text = result["text"]
@@ -1898,10 +1929,10 @@ async def ocr_extract(request: OcrRequest):
                     text = result
                 else:
                     text = str(result)
-                pages.append({"page": idx, "text": text.strip()})
+                pages.append({"page": idx, "text": _clean_ocr_output(text)})
 
-        combined = "\n\n".join(
-            [f"--- Page {page['page']} ---\n{page['text']}" for page in pages if page.get("text")]
+        combined = "\n\n---\n\n".join(
+            [page["text"] for page in pages if page.get("text")]
         )
 
         return {"pages": pages, "text": combined}
@@ -1915,10 +1946,11 @@ async def ocr_status():
     status = {
         "cuda_available": torch.cuda.is_available(),
         "model_loaded": _ocr_model is not None and _ocr_tokenizer is not None,
-        "model_id": os.getenv('OCR_MODEL_ID', 'unsloth/DeepSeek-OCR-2'),
-        "model_dir": os.getenv('OCR_MODEL_DIR', './data/ocr_model'),
+        "model_id": os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2'),
         "torch_version": torch.__version__,
-        "ocr_cuda_device": os.getenv('OCR_CUDA_DEVICE', '0')
+        "ocr_cuda_device": os.getenv('OCR_CUDA_DEVICE', '0'),
+        "dtype": str(_ocr_model.dtype) if _ocr_model is not None else None,
+        "load_error": _ocr_load_error
     }
 
     if torch.cuda.is_available():
