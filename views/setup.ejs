@@ -481,8 +481,10 @@
                                         <select id="ocrModelId"
                                                 name="ocrModelId"
                                                 class="modern-input">
-                                            <option value="deepseek-ai/DeepSeek-OCR-2" <%= config.OCR_MODEL_ID === 'deepseek-ai/DeepSeek-OCR-2' ? 'selected' : '' %>>DeepSeek-OCR-2</option>
                                             <option value="zai-org/GLM-OCR" <%= config.OCR_MODEL_ID === 'zai-org/GLM-OCR' ? 'selected' : '' %>>GLM-OCR</option>
+                                            <% if (config.OCR_ENABLE_DEEPSEEK === 'yes') { %>
+                                            <option value="deepseek-ai/DeepSeek-OCR-2" <%= config.OCR_MODEL_ID === 'deepseek-ai/DeepSeek-OCR-2' ? 'selected' : '' %>>DeepSeek-OCR-2</option>
+                                            <% } %>
                                         </select>
                                     </div>
                                     <script>
@@ -491,8 +493,8 @@
                                             const promptInput = document.getElementById('ocrPrompt');
                                             if (!modelSelect || !promptInput) return;
                                             const defaults = {
-                                                'deepseek-ai/DeepSeek-OCR-2': '<image>\\n<|grounding|>Convert the document to markdown.',
-                                                'zai-org/GLM-OCR': 'Text Recognition:'
+                                                'zai-org/GLM-OCR': 'Text Recognition:',
+                                                'deepseek-ai/DeepSeek-OCR-2': '<image>\\n<|grounding|>Convert the document to markdown.'
                                             };
                                             const applyDefault = () => {
                                                 const value = modelSelect.value;
@@ -586,6 +588,16 @@
                                                value="<%= config.OCR_CUDA_DEVICE %>"
                                                class="modern-input"
                                                min="0">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="ocrEnableDeepseek">Enable DeepSeek OCR</label>
+                                        <select id="ocrEnableDeepseek"
+                                                name="ocrEnableDeepseek"
+                                                class="modern-input">
+                                            <option value="no" <%= config.OCR_ENABLE_DEEPSEEK === 'no' ? 'selected' : '' %>>No</option>
+                                            <option value="yes" <%= config.OCR_ENABLE_DEEPSEEK === 'yes' ? 'selected' : '' %>>Yes</option>
+                                        </select>
                                     </div>
 
                                     <div class="form-group">

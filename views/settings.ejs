@@ -535,8 +535,8 @@
                                         const promptInput = document.getElementById('ocrPrompt');
                                         if (!modelSelect || !promptInput) return;
                                         const defaults = {
-                                            'deepseek-ai/DeepSeek-OCR-2': '<image>\\n<|grounding|>Convert the document to markdown.',
-                                            'zai-org/GLM-OCR': 'Text Recognition:'
+                                            'zai-org/GLM-OCR': 'Text Recognition:',
+                                            'deepseek-ai/DeepSeek-OCR-2': '<image>\\n<|grounding|>Convert the document to markdown.'
                                         };
                                         const applyDefault = () => {
                                             const value = modelSelect.value;
@@ -567,8 +567,10 @@
                                     <select id="ocrModelId"
                                             name="ocrModelId"
                                             class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                        <option value="deepseek-ai/DeepSeek-OCR-2" <%= config.OCR_MODEL_ID === 'deepseek-ai/DeepSeek-OCR-2' ? 'selected' : '' %>>DeepSeek-OCR-2</option>
                                         <option value="zai-org/GLM-OCR" <%= config.OCR_MODEL_ID === 'zai-org/GLM-OCR' ? 'selected' : '' %>>GLM-OCR</option>
+                                        <% if (config.OCR_ENABLE_DEEPSEEK === 'yes') { %>
+                                        <option value="deepseek-ai/DeepSeek-OCR-2" <%= config.OCR_MODEL_ID === 'deepseek-ai/DeepSeek-OCR-2' ? 'selected' : '' %>>DeepSeek-OCR-2</option>
+                                        <% } %>
                                     </select>
                                 </div>
 
@@ -650,6 +652,16 @@
                                            value="<%= config.OCR_CUDA_DEVICE %>"
                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                            min="0">
+                                </div>
+
+                                <div class="space-y-2">
+                                    <label for="ocrEnableDeepseek" class="text-sm font-medium">Enable DeepSeek OCR</label>
+                                    <select id="ocrEnableDeepseek"
+                                            name="ocrEnableDeepseek"
+                                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="no" <%= config.OCR_ENABLE_DEEPSEEK === 'no' ? 'selected' : '' %>>No</option>
+                                        <option value="yes" <%= config.OCR_ENABLE_DEEPSEEK === 'yes' ? 'selected' : '' %>>Yes</option>
+                                    </select>
                                 </div>
 
                                 <!-- Token Limit Field -->

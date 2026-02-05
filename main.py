@@ -257,10 +257,13 @@ def _load_ocr_model():
     torch.cuda.set_device(device_index)
     device = f"cuda:{device_index}"
 
-    model_id = os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2')
+    model_id = os.getenv('OCR_MODEL_ID', 'zai-org/GLM-OCR')
+    enable_deepseek = os.getenv('OCR_ENABLE_DEEPSEEK', 'no').lower() in ['yes', 'true', '1']
     dtype = _resolve_ocr_dtype()
 
     try:
+        if model_id == 'deepseek-ai/DeepSeek-OCR-2' and not enable_deepseek:
+            raise RuntimeError("DeepSeek-OCR-2 is disabled due to transformers incompatibility. Set OCR_ENABLE_DEEPSEEK=yes to re-enable.")
         if model_id == 'zai-org/GLM-OCR':
             _ocr_processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
             _ocr_model = AutoModelForImageTextToText.from_pretrained(
@@ -1913,7 +1916,7 @@ async def ocr_extract(request: OcrRequest):
 
     try:
         model, tokenizer, processor = _load_ocr_model()
-        prompt = request.prompt or os.getenv('OCR_PROMPT', '<image>\n<|grounding|>Convert the document to markdown.')
+        prompt = request.prompt or os.getenv('OCR_PROMPT', 'Text Recognition:')
         base_size = int(os.getenv('OCR_BASE_SIZE', '1024'))
         image_size = int(os.getenv('OCR_IMAGE_SIZE', '768'))
         crop_mode = os.getenv('OCR_CROP_MODE', 'true').lower() in ['true', '1', 'yes']
@@ -1925,7 +1928,7 @@ async def ocr_extract(request: OcrRequest):
             with tempfile.TemporaryDirectory() as temp_dir:
                 image_path = os.path.join(temp_dir, f"page_{idx}.png")
                 image.save(image_path)
-                if os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2') == 'zai-org/GLM-OCR':
+                if os.getenv('OCR_MODEL_ID', 'zai-org/GLM-OCR') == 'zai-org/GLM-OCR':
                     messages = [
                         {
                             "role": "user",
@@ -1984,7 +1987,7 @@ async def ocr_status():
     status = {
         "cuda_available": torch.cuda.is_available(),
         "model_loaded": _ocr_model is not None,
-        "model_id": os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2'),
+        "model_id": os.getenv('OCR_MODEL_ID', 'zai-org/GLM-OCR'),
         "torch_version": torch.__version__,
         "ocr_cuda_device": os.getenv('OCR_CUDA_DEVICE', '0'),
         "dtype": str(_ocr_model.dtype) if _ocr_model is not None and hasattr(_ocr_model, "dtype") else None,

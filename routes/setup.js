@@ -3718,7 +3718,8 @@ router.post('/setup', express.json(), async (req, res) => {
       ocrImageSize,
       ocrCropMode,
       ocrSaveResults,
-      ocrCudaDevice
+      ocrCudaDevice,
+      ocrEnableDeepseek
     } = req.body;
 
     // Log setup request with sensitive data redacted
@@ -3832,7 +3833,7 @@ router.post('/setup', express.json(), async (req, res) => {
       OCR_ENABLED: ocrEnabled || 'no',
       OCR_OVERWRITE_CONTENT: ocrOverwriteContent || 'no',
       OCR_SERVICE_URL: ocrServiceUrl || process.env.OCR_SERVICE_URL || 'http://localhost:8000',
-      OCR_MODEL_ID: ocrModelId || process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
+      OCR_MODEL_ID: ocrModelId || process.env.OCR_MODEL_ID || 'zai-org/GLM-OCR',
       OCR_PROMPT: ocrPrompt || ocrDefaultPrompt,
       OCR_MAX_PAGES: ocrMaxPages || '50',
       OCR_IMAGE_FORMAT: ocrImageFormat || 'png',
@@ -3845,6 +3846,7 @@ router.post('/setup', express.json(), async (req, res) => {
       OCR_CROP_MODE: ocrCropMode || 'true',
       OCR_SAVE_RESULTS: ocrSaveResults || 'false',
       OCR_CUDA_DEVICE: ocrCudaDevice || '0',
+      OCR_ENABLE_DEEPSEEK: process.env.OCR_ENABLE_DEEPSEEK || 'no',
       USE_EXISTING_DATA: useExistingData || 'no',
       API_KEY: apiToken,
       JWT_SECRET: jwtToken,
@@ -4232,14 +4234,15 @@ router.post('/settings', express.json(), async (req, res) => {
       OCR_ENABLED: process.env.OCR_ENABLED || 'no',
       OCR_OVERWRITE_CONTENT: process.env.OCR_OVERWRITE_CONTENT || 'no',
       OCR_SERVICE_URL: process.env.OCR_SERVICE_URL || 'http://localhost:8000',
-      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
-      OCR_PROMPT: process.env.OCR_PROMPT || '<image>\n<|grounding|>Convert the document to markdown.',
+      OCR_MODEL_ID: process.env.OCR_MODEL_ID || 'zai-org/GLM-OCR',
+      OCR_PROMPT: process.env.OCR_PROMPT || 'Text Recognition:',
       OCR_MAX_PAGES: process.env.OCR_MAX_PAGES || '50',
       OCR_IMAGE_FORMAT: process.env.OCR_IMAGE_FORMAT || 'png',
       OCR_DPI: process.env.OCR_DPI || '150',
       OCR_MAX_NEW_TOKENS: process.env.OCR_MAX_NEW_TOKENS || '4096',
       OCR_MAX_CHARS: process.env.OCR_MAX_CHARS || '50000',
       OCR_TIMEOUT_MS: process.env.OCR_TIMEOUT_MS || '120000',
+      OCR_ENABLE_DEEPSEEK: process.env.OCR_ENABLE_DEEPSEEK || 'no',
       OCR_BASE_SIZE: process.env.OCR_BASE_SIZE || '1024',
       OCR_IMAGE_SIZE: process.env.OCR_IMAGE_SIZE || '768',
       OCR_CROP_MODE: process.env.OCR_CROP_MODE || 'true',
@@ -4395,6 +4398,7 @@ router.post('/settings', express.json(), async (req, res) => {
     if (ocrCropMode) updatedConfig.OCR_CROP_MODE = ocrCropMode;
     if (ocrSaveResults) updatedConfig.OCR_SAVE_RESULTS = ocrSaveResults;
     if (ocrCudaDevice !== undefined && ocrCudaDevice !== null) updatedConfig.OCR_CUDA_DEVICE = ocrCudaDevice;
+    if (ocrEnableDeepseek) updatedConfig.OCR_ENABLE_DEEPSEEK = ocrEnableDeepseek;
 
     // Update custom fields
     if (processedCustomFields.length > 0 || customFields) {
