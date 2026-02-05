@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from tqdm import tqdm
 from contextlib import asynccontextmanager
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoProcessor, AutoModelForImageTextToText
 import torch
 from sentence_transformers import SentenceTransformer, CrossEncoder
 import chromadb
@@ -235,6 +235,7 @@ class GlobalState:
 # OCR model cache
 _ocr_model = None
 _ocr_tokenizer = None
+_ocr_processor = None
 _ocr_load_error = None
 
 def _resolve_ocr_dtype():
@@ -245,9 +246,9 @@ def _resolve_ocr_dtype():
     return torch.float32
 
 def _load_ocr_model():
-    global _ocr_model, _ocr_tokenizer, _ocr_load_error
-    if _ocr_model is not None and _ocr_tokenizer is not None:
-        return _ocr_model, _ocr_tokenizer
+    global _ocr_model, _ocr_tokenizer, _ocr_processor, _ocr_load_error
+    if _ocr_model is not None:
+        return _ocr_model, _ocr_tokenizer, _ocr_processor
 
     if not torch.cuda.is_available():
         raise NotImplementedError("OCR model requires a CUDA-capable GPU, but none was detected.")
@@ -260,18 +261,30 @@ def _load_ocr_model():
     dtype = _resolve_ocr_dtype()
 
     try:
-        _ocr_tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-        _ocr_model = AutoModel.from_pretrained(
-            model_id,
-            trust_remote_code=True,
-            use_safetensors=True
-        ).eval().to(device).to(dtype)
+        if model_id == 'zai-org/GLM-OCR':
+            _ocr_processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+            _ocr_model = AutoModelForImageTextToText.from_pretrained(
+                pretrained_model_name_or_path=model_id,
+                trust_remote_code=True,
+                torch_dtype="auto",
+                device_map="auto"
+            )
+            _ocr_tokenizer = None
+        else:
+            _ocr_tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+            _ocr_model = AutoModel.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+                use_safetensors=True
+            ).eval().to(device).to(dtype)
+            _ocr_processor = None
+
         _ocr_load_error = None
     except Exception as e:
         _ocr_load_error = str(e)
         raise
 
-    return _ocr_model, _ocr_tokenizer
+    return _ocr_model, _ocr_tokenizer, _ocr_processor
 
 def _decode_image_from_base64(data_url: str):
     from PIL import Image
@@ -1899,7 +1912,7 @@ async def ocr_extract(request: OcrRequest):
         raise HTTPException(status_code=400, detail="No images provided")
 
     try:
-        model, tokenizer = _load_ocr_model()
+        model, tokenizer, processor = _load_ocr_model()
         prompt = request.prompt or os.getenv('OCR_PROMPT', '<image>\n<|grounding|>Convert the document to markdown.')
         base_size = int(os.getenv('OCR_BASE_SIZE', '1024'))
         image_size = int(os.getenv('OCR_IMAGE_SIZE', '768'))
@@ -1912,24 +1925,49 @@ async def ocr_extract(request: OcrRequest):
             with tempfile.TemporaryDirectory() as temp_dir:
                 image_path = os.path.join(temp_dir, f"page_{idx}.png")
                 image.save(image_path)
-                result = model.infer(
-                    tokenizer,
-                    prompt=prompt,
-                    image_file=image_path,
-                    output_path=temp_dir,
-                    base_size=base_size,
-                    image_size=image_size,
-                    crop_mode=crop_mode,
-                    save_results=save_results,
-                    eval_mode=True
-                )
-                if isinstance(result, dict) and "text" in result:
-                    text = result["text"]
-                elif isinstance(result, str):
-                    text = result
+                if os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2') == 'zai-org/GLM-OCR':
+                    messages = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "url": image_path},
+                                {"type": "text", "text": prompt}
+                            ],
+                        }
+                    ]
+                    inputs = processor.apply_chat_template(
+                        messages,
+                        tokenize=True,
+                        add_generation_prompt=True,
+                        return_dict=True,
+                        return_tensors="pt"
+                    ).to(model.device)
+                    inputs.pop("token_type_ids", None)
+                    generated_ids = model.generate(**inputs, max_new_tokens=8192)
+                    output_text = processor.decode(
+                        generated_ids[0][inputs["input_ids"].shape[1]:],
+                        skip_special_tokens=False
+                    )
+                    pages.append({"page": idx, "text": _clean_ocr_output(output_text)})
                 else:
-                    text = str(result)
-                pages.append({"page": idx, "text": _clean_ocr_output(text)})
+                    result = model.infer(
+                        tokenizer,
+                        prompt=prompt,
+                        image_file=image_path,
+                        output_path=temp_dir,
+                        base_size=base_size,
+                        image_size=image_size,
+                        crop_mode=crop_mode,
+                        save_results=save_results,
+                        eval_mode=True
+                    )
+                    if isinstance(result, dict) and "text" in result:
+                        text = result["text"]
+                    elif isinstance(result, str):
+                        text = result
+                    else:
+                        text = str(result)
+                    pages.append({"page": idx, "text": _clean_ocr_output(text)})
 
         combined = "\n\n---\n\n".join(
             [page["text"] for page in pages if page.get("text")]
@@ -1945,11 +1983,11 @@ async def ocr_extract(request: OcrRequest):
 async def ocr_status():
     status = {
         "cuda_available": torch.cuda.is_available(),
-        "model_loaded": _ocr_model is not None and _ocr_tokenizer is not None,
+        "model_loaded": _ocr_model is not None,
         "model_id": os.getenv('OCR_MODEL_ID', 'deepseek-ai/DeepSeek-OCR-2'),
         "torch_version": torch.__version__,
         "ocr_cuda_device": os.getenv('OCR_CUDA_DEVICE', '0'),
-        "dtype": str(_ocr_model.dtype) if _ocr_model is not None else None,
+        "dtype": str(_ocr_model.dtype) if _ocr_model is not None and hasattr(_ocr_model, "dtype") else None,
         "load_error": _ocr_load_error
     }
 

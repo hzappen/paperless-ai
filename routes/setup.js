@@ -3804,6 +3804,9 @@ router.post('/setup', express.json(), async (req, res) => {
     const processedPrompt = systemPrompt 
       ? systemPrompt.replace(/\r\n/g, '\n').replace(/\n/g, '\\n').replace(/=/g, '')
       : '';
+    const ocrDefaultPrompt = (ocrModelId || process.env.OCR_MODEL_ID) === 'zai-org/GLM-OCR'
+      ? 'Text Recognition:'
+      : '<image>\\n<|grounding|>Convert the document to markdown.';
 
     // Prepare base config
     const config = {
@@ -3830,7 +3833,7 @@ router.post('/setup', express.json(), async (req, res) => {
       OCR_OVERWRITE_CONTENT: ocrOverwriteContent || 'no',
       OCR_SERVICE_URL: ocrServiceUrl || process.env.OCR_SERVICE_URL || 'http://localhost:8000',
       OCR_MODEL_ID: ocrModelId || process.env.OCR_MODEL_ID || 'deepseek-ai/DeepSeek-OCR-2',
-      OCR_PROMPT: ocrPrompt || '<image>\n<|grounding|>Convert the document to markdown.',
+      OCR_PROMPT: ocrPrompt || ocrDefaultPrompt,
       OCR_MAX_PAGES: ocrMaxPages || '50',
       OCR_IMAGE_FORMAT: ocrImageFormat || 'png',
       OCR_DPI: ocrDpi || '150',
@@ -4372,7 +4375,14 @@ router.post('/settings', express.json(), async (req, res) => {
     if (ocrEnabled) updatedConfig.OCR_ENABLED = ocrEnabled;
     if (ocrOverwriteContent) updatedConfig.OCR_OVERWRITE_CONTENT = ocrOverwriteContent;
     if (ocrServiceUrl) updatedConfig.OCR_SERVICE_URL = ocrServiceUrl;
-    if (ocrModelId) updatedConfig.OCR_MODEL_ID = ocrModelId;
+    if (ocrModelId) {
+      updatedConfig.OCR_MODEL_ID = ocrModelId;
+      if (!ocrPrompt) {
+        updatedConfig.OCR_PROMPT = ocrModelId === 'zai-org/GLM-OCR'
+          ? 'Text Recognition:'
+          : '<image>\\n<|grounding|>Convert the document to markdown.';
+      }
+    }
     if (ocrPrompt) updatedConfig.OCR_PROMPT = ocrPrompt;
     if (ocrMaxPages) updatedConfig.OCR_MAX_PAGES = ocrMaxPages;
     if (ocrImageFormat) updatedConfig.OCR_IMAGE_FORMAT = ocrImageFormat;
